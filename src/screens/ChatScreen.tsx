@@ -1,9 +1,12 @@
-import { View, Text, TouchableOpacity, StyleSheet, Image, FlatList } from 'react-native'
-import React from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, Image, FlatList, SafeAreaView } from 'react-native'
+import React, { useEffect, useState } from 'react'
 import Header from '../components/Header'
 import IconLabel from '../components/IconLabel'
 import Icon from 'react-native-vector-icons/FontAwesome'
-import ChatInputField from '../components/ChatInputField'
+import ChatInputField, { RecordedAudioView } from '../components/ChatInputField'
+import { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated'
+import AudioRecorderPlayer from 'react-native-audio-recorder-player'
+import AudioMessageView from '../components/AudioMessageView'
 
 const chipsData = [
     {
@@ -40,9 +43,39 @@ const chipsData = [
 ]
 
 const ChatScreen = () => {
+    const audioRecorderPlayer = new AudioRecorderPlayer();
+    audioRecorderPlayer.setSubscriptionDuration(0.1);
+    const [audioFiles, setAudioFiles] = useState<number[][]>([]);
+    const [playingAudio, setPlayingAudio] = useState<boolean>(false);
+    const [waveformData, setWaveformData] = useState<number[] | null>(null);
+    const [recordDuration, setRecordDuration] = useState("00:00")
+    const [onPlayPause, setOnPlayPause] = useState<null | (() => void)>(null);
+
+    const width = useSharedValue<number>(10);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        width: withTiming(width.value, { duration: 1000 }),
+        backgroundColor: 'transparent',
+    }));
+
+    useEffect(() => {
+        console.log("Data => ", waveformData)
+    }, [waveformData])
+
+
+    const togglePlayback = async () => {
+        if (playingAudio) {
+            await audioRecorderPlayer.stopPlayer();
+            setPlayingAudio(false);
+        } else {
+            await audioRecorderPlayer.startPlayer();
+            setPlayingAudio(true);
+        }
+    };
     return (
         <View style={{ flex: 1, padding: 20 }}>
             <View style={{ flex: 1 }}>
+                <SafeAreaView />
                 <Header
                     leftItem={
                         <TouchableOpacity style={{ height: 15, justifyContent: 'space-between', margin: 10 }}>
@@ -63,30 +96,49 @@ const ChatScreen = () => {
                     }
                     rightItem={<View style={{ width: 30 }} />}
                 />
-                <View style={{ flex: 1 }}>
-                    <View>
-                        <Text style={styles.description}>Hi there! 👋 My name is Tratoli. How can I assist you today?</Text>
-                    </View>
-                    <View style={styles.chipsContainer}>
-                        <FlatList
-                            data={chipsData}
-                            numColumns={3}
-                            keyExtractor={(item) => item.title}
-                            renderItem={({ item }) => (
-                                <IconLabel
-                                    label={item.title}
-                                    iconName={item.iconName}
-                                    isActive={item.isActive}
-                                    onPress={() => { }}
-                                    iconColor={item.iconColor}
+                {
+                    audioFiles.length > 0
+                        ? <View style={{ flex: 1, paddingTop: 50, alignItems: 'flex-end' }}>
+                            <FlatList
+                                data={audioFiles}
+                                style={{ flex: 1, width: 300 }}
+                                renderItem={({ item }) => {
+                                    console.log('item =>', item)
+                                    return (
+                                        <View style={{ flex: 1, marginVertical: 5 }}>
+                                            <AudioMessageView animatedStyle={animatedStyle} onPlayPause={togglePlayback} playingAudio={playingAudio} waveformData={item} recordDuration={recordDuration} />
+                                        </View>
+                                    )
+                                }}
+                            />
+
+                        </View>
+                        : <View style={{ flex: 1 }}>
+                            <View>
+                                <Text style={styles.description}>Hi there! 👋 My name is Tratoli. How can I assist you today?</Text>
+                            </View>
+                            <View style={styles.chipsContainer}>
+                                <FlatList
+                                    data={chipsData}
+                                    numColumns={3}
+                                    keyExtractor={(item) => item.title}
+                                    renderItem={({ item }) => (
+                                        <IconLabel
+                                            label={item.title}
+                                            iconName={item.iconName}
+                                            isActive={item.isActive}
+                                            onPress={() => { }}
+                                            iconColor={item.iconColor}
+                                        />
+                                    )}
+                                    contentContainerStyle={styles.flatListContent}
                                 />
-                            )}
-                            contentContainerStyle={styles.flatListContent}
-                        />
-                    </View>
-                </View>
+                            </View>
+                        </View>
+                }
             </View>
-            <ChatInputField />
+
+            <ChatInputField audioFiles={audioFiles} setAudioFiles={setAudioFiles} setWaveformDataToLocal={setWaveformData} setRecordDurationToLocal={setRecordDuration} setOnPlayPauseToLocal={setOnPlayPause} />
         </View>
     )
 }
